@@ -12,11 +12,15 @@ struct SyncMiniSnapshot {
     String action_hint;
     String recommended_action;
     String occupancy_state;
+    String status_hint;
     uint16_t online_devices = 0;
     uint16_t offline_devices = 0;
     uint16_t missing_devices = 0;
     uint16_t conflict_count = 0;
     uint16_t device_count = 0;
+    uint32_t last_sync_ok_ms = 0;
+    uint32_t last_sync_fail_ms = 0;
+    uint8_t sync_fail_count = 0;
 };
 
 inline const char* syncHealthColor(const String& health_level) {
@@ -26,3 +30,4 @@ inline const char* syncHealthColor(const String& health_level) {
     if (health_level == "idle") return "blue";
     return "green";
 }
+

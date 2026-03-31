@@ -12,6 +12,9 @@ public:
         backend_base_url_ = backend_base_url;
         pet_id_ = pet_id;
         last_fetch_ms_ = 0;
+        last_ok_ms_ = 0;
+        last_fail_ms_ = 0;
+        fail_count_ = 0;
     }
 
     bool ready() const {
@@ -20,6 +23,8 @@ public:
 
     bool fetchMini(SyncMiniSnapshot& out) {
         if (!ready()) {
+            fail_count_++;
+            last_fail_ms_ = millis();
             return false;
         }
         HTTPClient http;
@@ -32,14 +37,23 @@ public:
         int status = http.GET();
         if (status != 200) {
             http.end();
+            fail_count_++;
+            last_fail_ms_ = millis();
             return false;
         }
         String body = http.getString();
         http.end();
         if (!parseMini(body, out)) {
+            fail_count_++;
+            last_fail_ms_ = millis();
             return false;
         }
         last_fetch_ms_ = millis();
+        last_ok_ms_ = last_fetch_ms_;
+        fail_count_ = 0;
+        out.last_sync_ok_ms = last_ok_ms_;
+        out.last_sync_fail_ms = last_fail_ms_;
+        out.sync_fail_count = fail_count_;
         return true;
     }
 
@@ -51,10 +65,25 @@ public:
         return last_fetch_ms_;
     }
 
+    uint32_t lastOkMs() const {
+        return last_ok_ms_;
+    }
+
+    uint32_t lastFailMs() const {
+        return last_fail_ms_;
+    }
+
+    uint8_t failCount() const {
+        return fail_count_;
+    }
+
 private:
     String backend_base_url_;
     String pet_id_;
     uint32_t last_fetch_ms_ = 0;
+    uint32_t last_ok_ms_ = 0;
+    uint32_t last_fail_ms_ = 0;
+    uint8_t fail_count_ = 0;
 
     static String readStringField(const String& json, const char* key) {
         String needle = String("\"") + key + "\":";
@@ -124,11 +153,16 @@ private:
         out.action_hint = readStringField(json, "action_hint");
         out.recommended_action = readStringField(json, "recommended_action");
         out.occupancy_state = readStringField(json, "occupancy_state");
+        out.status_hint = readStringField(json, "status_hint");
         out.online_devices = readUIntField(json, "online_devices", 0);
         out.offline_devices = readUIntField(json, "offline_devices", 0);
         out.missing_devices = readUIntField(json, "missing_devices", 0);
         out.conflict_count = readUIntField(json, "conflict_count", 0);
         out.device_count = readUIntField(json, "device_count", 0);
+        out.last_sync_ok_ms = 0;
+        out.last_sync_fail_ms = 0;
+        out.sync_fail_count = 0;
         return out.subject_id.length() > 0 && out.health_level.length() > 0;
     }
 };
+

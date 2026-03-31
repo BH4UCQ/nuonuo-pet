@@ -40,10 +40,13 @@ struct PetState {
     bool network_ready = false;
     bool is_bound = false;
     uint8_t bind_retry_count = 0;
+    uint8_t sync_fail_count = 0;
     uint32_t energy = 100;
     uint32_t happiness = 50;
     uint32_t hunger = 20;
     uint32_t last_tick_ms = 0;
+    uint32_t last_sync_ok_ms = 0;
+    uint32_t last_sync_fail_ms = 0;
 };
 
 inline const char* deviceStateName(DeviceState state) {
@@ -72,3 +75,4 @@ inline const char* moodName(PetMood mood) {
         default: return "Unknown";
     }
 }
+

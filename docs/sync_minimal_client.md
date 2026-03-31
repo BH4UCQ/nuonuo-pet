@@ -17,6 +17,9 @@
 - `recommended_action`：机器可读动作
 - `occupancy_state`：`free / claimed / conflicted`
 - `online_devices` / `offline_devices` / `missing_devices` / `conflict_count`
+- `status_hint`：同步状态说明
+- `last_sync_ok_ms` / `last_sync_fail_ms`：用于降级节奏控制
+- `sync_fail_count`：用于决定是否进入恢复/错误态
 
 ## 设备端渲染建议
 
@@ -25,6 +28,7 @@
 3. 如果有 `primary_hint`，放在主区域
 4. 如果有 `action_hint`，放底部按钮提示
 5. `recommended_action` 留给状态机/自动修复逻辑
+6. `status_hint` 可用于“正在恢复 / 网络不可用 / 服务器无响应”之类提示
 
 ## 示例
 
@@ -39,11 +43,15 @@
   "action_hint": "先解除设备冲突，再继续同步。",
   "recommended_action": "resolve_device_conflict",
   "occupancy_state": "conflicted",
+  "status_hint": "sync delayed: offline device detected",
   "online_devices": 1,
   "offline_devices": 1,
   "missing_devices": 0,
   "conflict_count": 1,
   "device_count": 2,
+  "last_sync_ok_ms": 123456,
+  "last_sync_fail_ms": 123000,
+  "sync_fail_count": 2,
   "notes": ["device dev-b offline"]
 }
 ```
@@ -56,6 +64,15 @@
 - `summary_line` → 顶部文案
 - `primary_hint` → 主提示
 - `action_hint` → 按钮提示
+- `status_hint` → 降级提示
 - `recommended_action` → 状态机修复动作
 
+### 降级行为建议
+
+- 第 1 次失败：只提示“同步失败，重试中”
+- 连续 3 次失败：进入 `Recovering`
+- 连续 8 次失败：进入 `Error`
+- 恢复成功后：清零失败计数，回到 `Ready`
+
 后续只要把这份结构从 HTTP 拉下来并喂给 `applySyncMini()` 即可。
+

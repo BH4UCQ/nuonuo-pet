@@ -6,6 +6,9 @@
 
 namespace {
 PetApp app;
+constexpr uint8_t kSyncFailToRecover = 3;
+constexpr uint8_t kSyncFailToError = 8;
+constexpr uint32_t kRecoverHoldMs = 8000;
 }
 
 PetApp::PetApp() {
@@ -59,6 +62,18 @@ void PetApp::update() {
         logStateChange("bound");
     }
 
+    if (state_.sync_fail_count >= kSyncFailToRecover && state_.device_state == DeviceState::Ready) {
+        state_.activity = PetActivity::Recovering;
+        logStateChange("sync_recovering");
+    }
+
+    if (state_.activity == PetActivity::Recovering && now_ms - state_.last_sync_ok_ms > kRecoverHoldMs) {
+        if (state_.sync_fail_count >= kSyncFailToError) {
+            state_.device_state = DeviceState::Error;
+            logStateChange("sync_error");
+        }
+    }
+
     if (state_.energy < 10 && state_.device_state == DeviceState::Ready) {
         state_.device_state = DeviceState::LowPower;
         state_.activity = PetActivity::Sleeping;
@@ -109,16 +124,42 @@ void PetApp::pollSync(uint32_t now_ms) {
         return;
     }
     if (!sync_client_.ready()) {
+        state_.sync_fail_count += 1;
+        state_.last_sync_fail_ms = now_ms;
         Serial.println("[nuonuo] sync=skip reason=not_ready");
         return;
     }
     SyncMiniSnapshot snapshot;
     if (sync_client_.fetchMini(snapshot)) {
+        state_.sync_fail_count = 0;
+        state_.last_sync_ok_ms = now_ms;
+        snapshot.sync_fail_count = 0;
+        snapshot.last_sync_ok_ms = now_ms;
+        snapshot.last_sync_fail_ms = state_.last_sync_fail_ms;
         applySyncMini(snapshot);
+        if (state_.activity == PetActivity::Recovering) {
+            state_.activity = PetActivity::Idle;
+            logStateChange("sync_recovered");
+        }
+        if (state_.device_state == DeviceState::Error) {
+            state_.device_state = DeviceState::Ready;
+            logStateChange("sync_error_clear");
+        }
         Serial.print("[nuonuo] sync=ok at=");
         Serial.println(now_ms);
     } else {
-        Serial.println("[nuonuo] sync=fail");
+        state_.sync_fail_count += 1;
+        state_.last_sync_fail_ms = now_ms;
+        if (state_.sync_fail_count >= kSyncFailToError) {
+            state_.device_state = DeviceState::Error;
+            state_.activity = PetActivity::Recovering;
+            logStateChange("sync_fail_error");
+        } else if (state_.sync_fail_count >= kSyncFailToRecover) {
+            state_.activity = PetActivity::Recovering;
+            logStateChange("sync_fail_recovering");
+        }
+        Serial.print("[nuonuo] sync=fail count=");
+        Serial.println(state_.sync_fail_count);
     }
 }
 
@@ -145,7 +186,11 @@ void PetApp::updateEnergy(uint32_t now_ms) {
 }
 
 void PetApp::updateMood() {
-    if (state_.hunger > 70) {
+    if (state_.device_state == DeviceState::Error) {
+        state_.mood = PetMood::Sad;
+    } else if (state_.sync_fail_count >= kSyncFailToRecover) {
+        state_.mood = PetMood::Lonely;
+    } else if (state_.hunger > 70) {
         state_.mood = PetMood::Hungry;
     } else if (state_.energy < 20) {
         state_.mood = PetMood::Sleepy;
@@ -176,6 +221,10 @@ void PetApp::renderSyncMini(const SyncMiniSnapshot& snapshot) {
     Serial.print(syncHealthColor(snapshot.health_level));
     Serial.print(" summary=");
     Serial.println(snapshot.summary_line);
+    if (snapshot.status_hint.length() > 0) {
+        Serial.print("[nuonuo] status_hint=");
+        Serial.println(snapshot.status_hint);
+    }
     if (snapshot.primary_hint.length() > 0) {
         Serial.print("[nuonuo] primary_hint=");
         Serial.println(snapshot.primary_hint);
@@ -196,4 +245,6 @@ void loop() {
     app.update();
     delay(50);
 }
+
+
 
