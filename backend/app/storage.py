@@ -60,6 +60,8 @@ class PetRecord:
     energy: int = 100
     hunger: int = 20
     affection: int = 50
+    owner_id: str | None = None
+    device_id: str | None = None
     primary_device_id: str | None = None
     linked_device_ids: List[str] = field(default_factory=list)
     growth_preferences: Dict[str, int] = field(default_factory=lambda: {"play": 0, "care": 0, "rest": 0, "feed": 0, "chat": 0, "praise": 0})
@@ -86,6 +88,7 @@ DEVICES: Dict[str, DeviceRecord] = {}
 DEVICE_EVENTS: Dict[str, List[DeviceEventRecord]] = {}
 PETS: Dict[str, PetRecord] = {}
 MEMORY: Dict[str, List[MemoryRecord]] = {}
+EVENTS: Dict[str, List[EventRecord]] = {}
 RESOURCE_PACKS: Dict[str, Dict[str, Any]] = {}
 RESOURCE_SLOT_RULES: Dict[str, Dict[str, Any]] = {
     "body": {"resource_type": "sprite", "max_width": 128, "max_height": 128, "formats": ["png", "webp"]},

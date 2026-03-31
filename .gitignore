@@ -38,3 +38,6 @@ nuonuo-pet_v0.1.0_release_bundle.zip
 RELEASE_MANIFEST.txt
 v0.2.0_plan.*
 v0.2.0_plan_bundle.zip
+
+# Runtime state
+backend/data/
