@@ -577,6 +577,10 @@ def pet_linked_device_ids(pet: PetRecord) -> list[str]:
     return deduped
 
 
+def pets_claiming_device(device_id: str) -> list[PetRecord]:
+    return [pet for pet in PETS.values() if pet.device_id == device_id or device_id in list(getattr(pet, "linked_device_ids", []) or [])]
+
+
 def pet_device_owner(device_id: str) -> PetRecord | None:
     return next((pet for pet in PETS.values() if pet.device_id == device_id), None)
 
@@ -612,18 +616,37 @@ def build_pet_sync_summary(pet: PetRecord) -> PetSyncSummaryResponse:
     device_items: list[PetSyncDeviceItem] = []
     recent_device_events: dict[str, list[dict[str, object]]] = {}
     sync_notes: list[str] = []
+    conflict_notes: list[str] = []
+    conflict_device_ids: list[str] = []
+    online_devices = 0
+    offline_devices = 0
+    missing_devices = 0
+    primary_device_present = False
+    primary_device_online = False
     for idx, device_id in enumerate(linked_ids):
         device = DEVICES.get(device_id)
         health = device_health_snapshot(device) if device is not None else None
         recent_device_events[device_id] = pet_device_recent_events(device_id)
+        claims = [item.pet_id for item in pets_claiming_device(device_id)]
+        if len(claims) > 1:
+            conflict_device_ids.append(device_id)
+            conflict_notes.append(f"device {device_id} claimed by {', '.join(sorted(set(claims)))}")
         if health is None:
+            missing_devices += 1
             sync_notes.append(f"device {device_id} missing")
         elif health["is_offline"]:
+            offline_devices += 1
             sync_notes.append(f"device {device_id} offline")
+        else:
+            online_devices += 1
+        is_primary = idx == 0
+        if is_primary:
+            primary_device_present = device is not None
+            primary_device_online = bool(health and not health["is_offline"])
         device_items.append(
             PetSyncDeviceItem(
                 device_id=device_id,
-                is_primary=idx == 0,
+                is_primary=is_primary,
                 connection_state=health["connection_state"] if health else None,
                 last_seen_at=health["last_seen_at"] if health else None,
                 is_online=bool(health and not health["is_offline"]),
@@ -632,12 +655,21 @@ def build_pet_sync_summary(pet: PetRecord) -> PetSyncSummaryResponse:
             )
         )
     recent_pet = pet_recent_events(pet.pet_id)
+    if pet.device_id and pet.device_id not in linked_ids:
+        sync_notes.append(f"primary device {pet.device_id} is not linked")
     return PetSyncSummaryResponse(
         pet_id=pet.pet_id,
         server_time=server_time(),
         primary_device_id=pet.device_id,
         linked_device_ids=linked_ids,
         total_devices=len(device_items),
+        online_devices=online_devices,
+        offline_devices=offline_devices,
+        missing_devices=missing_devices,
+        conflict_device_ids=conflict_device_ids,
+        conflict_notes=conflict_notes,
+        primary_device_present=primary_device_present,
+        primary_device_online=primary_device_online,
         device_items=device_items,
         recent_pet_events=recent_pet,
         recent_device_events=recent_device_events,
@@ -649,14 +681,25 @@ def build_device_sync_summary(device_id: str) -> DeviceSyncSummaryResponse:
     device = DEVICES.get(device_id)
     if device is None:
         raise HTTPException(status_code=404, detail="device not found")
-    pet = pet_device_owner(device_id)
+    pets = pets_claiming_device(device_id)
+    pet = next((item for item in pets if item.device_id == device_id), None)
     summary = build_pet_sync_summary(pet) if pet is not None else None
+    linked_pet_ids = [item.pet_id for item in pets]
+    conflict_notes: list[str] = []
+    if len(linked_pet_ids) > 1:
+        conflict_notes.append(f"device {device_id} claimed by {', '.join(sorted(linked_pet_ids))}")
+    occupancy_state = "free"
+    if linked_pet_ids:
+        occupancy_state = "conflicted" if len(linked_pet_ids) > 1 else "claimed"
     return DeviceSyncSummaryResponse(
         device_id=device_id,
         server_time=server_time(),
         pet_id=pet.pet_id if pet else None,
         primary_device_id=pet.device_id if pet else None,
         linked_device_ids=pet_linked_device_ids(pet) if pet else [],
+        linked_pet_ids=linked_pet_ids,
+        occupancy_state=occupancy_state,
+        conflict_notes=conflict_notes,
         device_state=dict(device.state),
         recent_events=pet_device_recent_events(device_id),
         pet_summary=summary,
@@ -1489,13 +1532,26 @@ def pet_broadcast_summary(pet_id: str) -> PetBroadcastSummaryResponse:
     device_items: list[PetSyncDeviceItem] = []
     broadcast_items: list[PetBroadcastItem] = []
     sync_notes: list[str] = []
+    conflict_notes: list[str] = []
+    conflict_device_ids: list[str] = []
+    online_devices = 0
+    offline_devices = 0
+    missing_devices = 0
     for idx, device_id in enumerate(linked_ids):
         device = DEVICES.get(device_id)
         health = device_health_snapshot(device) if device is not None else None
+        claims = [item.pet_id for item in pets_claiming_device(device_id)]
+        if len(claims) > 1:
+            conflict_device_ids.append(device_id)
+            conflict_notes.append(f"device {device_id} claimed by {', '.join(sorted(set(claims)))}")
         if health is None:
+            missing_devices += 1
             sync_notes.append(f"device {device_id} missing")
         elif health["is_offline"]:
+            offline_devices += 1
             sync_notes.append(f"device {device_id} offline")
+        else:
+            online_devices += 1
         device_items.append(
             PetSyncDeviceItem(
                 device_id=device_id,
@@ -1521,6 +1577,11 @@ def pet_broadcast_summary(pet_id: str) -> PetBroadcastSummaryResponse:
         pet_id=pet.pet_id,
         server_time=server_time(),
         total_devices=len(device_items),
+        online_devices=online_devices,
+        offline_devices=offline_devices,
+        missing_devices=missing_devices,
+        conflict_device_ids=conflict_device_ids,
+        conflict_notes=conflict_notes,
         primary_device_id=pet.device_id,
         linked_device_ids=linked_ids,
         broadcast_items=broadcast_items[-15:],
