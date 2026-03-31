@@ -333,6 +333,25 @@ class PetSyncSummaryResponse(BaseModel):
     sync_notes: List[str] = Field(default_factory=list)
 
 
+class PetBroadcastItem(BaseModel):
+    device_id: Optional[str] = None
+    kind: str
+    message: str
+    created_at: Optional[str] = None
+    meta: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PetBroadcastSummaryResponse(BaseModel):
+    pet_id: str
+    server_time: Optional[str] = None
+    total_devices: int = 0
+    primary_device_id: Optional[str] = None
+    linked_device_ids: List[str] = Field(default_factory=list)
+    broadcast_items: List[PetBroadcastItem] = Field(default_factory=list)
+    device_items: List[PetSyncDeviceItem] = Field(default_factory=list)
+    sync_notes: List[str] = Field(default_factory=list)
+
+
 class DeviceSyncSummaryResponse(BaseModel):
     device_id: str
     server_time: Optional[str] = None

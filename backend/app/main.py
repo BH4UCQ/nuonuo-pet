@@ -47,6 +47,8 @@ from .models import (
     PetDeviceUnlinkResponse,
     PetSyncDeviceItem,
     PetSyncSummaryResponse,
+    PetBroadcastItem,
+    PetBroadcastSummaryResponse,
     DeviceSyncSummaryResponse,
     PetEventRequest,
     PetEventResponse,
@@ -661,6 +663,42 @@ def build_device_sync_summary(device_id: str) -> DeviceSyncSummaryResponse:
     )
 
 
+def broadcast_device_event_to_pet(pet: PetRecord, source_device_id: str, kind: str, message: str, meta: dict | None = None) -> None:
+    payload = dict(meta or {})
+    payload["source_device_id"] = source_device_id
+    payload["broadcast"] = True
+    EVENTS.setdefault(pet.pet_id, []).append(
+        EventRecord(
+            kind=kind,
+            text=message,
+            tags=["device", "broadcast", "system"],
+            created_at=server_time(),
+        )
+    )
+    if source_device_id:
+        DEVICE_EVENTS.setdefault(source_device_id, []).append(
+            DeviceEventRecord(
+                device_id=source_device_id,
+                kind=f"broadcast:{kind}",
+                message=message,
+                created_at=server_time(),
+                meta=payload,
+            )
+        )
+    for linked_device_id in pet_linked_device_ids(pet):
+        if linked_device_id == source_device_id:
+            continue
+        DEVICE_EVENTS.setdefault(linked_device_id, []).append(
+            DeviceEventRecord(
+                device_id=linked_device_id,
+                kind=f"sync:{kind}",
+                message=message,
+                created_at=server_time(),
+                meta=payload,
+            )
+        )
+
+
 def detach_device_from_pet(pet: PetRecord, device_id: str) -> bool:
     changed = False
     if pet.device_id == device_id:
@@ -693,35 +731,14 @@ def sync_pets_with_device(rec: DeviceRecord, reason: str, meta: dict | None = No
     for pet in pets:
         if rec.connection_state == "offline":
             pet.mood = "lonely" if pet.affection < 40 else pet.mood
-            EVENTS.setdefault(pet.pet_id, []).append(
-                EventRecord(
-                    kind="device-offline",
-                    text=reason,
-                    tags=["device", "offline", "system"],
-                    created_at=server_time(),
-                )
-            )
+            broadcast_device_event_to_pet(pet, rec.device_id, "device-offline", reason, meta)
         elif reason in {"reconnect", "resume", "heartbeat"}:
             pet.energy = normalize_bounds(pet.energy + 5)
             if pet.mood == "lonely":
                 pet.mood = "curious"
-            EVENTS.setdefault(pet.pet_id, []).append(
-                EventRecord(
-                    kind="device-reconnect",
-                    text=reason,
-                    tags=["device", "reconnect", "system"],
-                    created_at=server_time(),
-                )
-            )
-        if meta:
-            EVENTS.setdefault(pet.pet_id, []).append(
-                EventRecord(
-                    kind="device-state",
-                    text=reason,
-                    tags=["device", "state", "system"],
-                    created_at=server_time(),
-                )
-            )
+            broadcast_device_event_to_pet(pet, rec.device_id, "device-reconnect", reason, meta)
+        elif meta:
+            broadcast_device_event_to_pet(pet, rec.device_id, "device-state", reason, meta)
     save_state()
 
 
@@ -1463,6 +1480,53 @@ def pet_sync_summary(pet_id: str) -> PetSyncSummaryResponse:
 @app.get("/api/device/{device_id}/sync", response_model=DeviceSyncSummaryResponse)
 def device_sync_summary(device_id: str) -> DeviceSyncSummaryResponse:
     return build_device_sync_summary(device_id)
+
+
+@app.get("/api/pet/{pet_id}/broadcast", response_model=PetBroadcastSummaryResponse)
+def pet_broadcast_summary(pet_id: str) -> PetBroadcastSummaryResponse:
+    pet = pet_or_404(pet_id)
+    linked_ids = pet_linked_device_ids(pet)
+    device_items: list[PetSyncDeviceItem] = []
+    broadcast_items: list[PetBroadcastItem] = []
+    sync_notes: list[str] = []
+    for idx, device_id in enumerate(linked_ids):
+        device = DEVICES.get(device_id)
+        health = device_health_snapshot(device) if device is not None else None
+        if health is None:
+            sync_notes.append(f"device {device_id} missing")
+        elif health["is_offline"]:
+            sync_notes.append(f"device {device_id} offline")
+        device_items.append(
+            PetSyncDeviceItem(
+                device_id=device_id,
+                is_primary=idx == 0,
+                connection_state=health["connection_state"] if health else None,
+                last_seen_at=health["last_seen_at"] if health else None,
+                is_online=bool(health and not health["is_offline"]),
+                offline_reason=health["offline_reason"] if health else None,
+                event_count=len(DEVICE_EVENTS.get(device_id, [])),
+            )
+        )
+        for item in pet_device_recent_events(device_id, limit=3):
+            broadcast_items.append(
+                PetBroadcastItem(
+                    device_id=device_id,
+                    kind=item["kind"],
+                    message=item["message"],
+                    created_at=item["created_at"],
+                    meta=dict(item["meta"]),
+                )
+            )
+    return PetBroadcastSummaryResponse(
+        pet_id=pet.pet_id,
+        server_time=server_time(),
+        total_devices=len(device_items),
+        primary_device_id=pet.device_id,
+        linked_device_ids=linked_ids,
+        broadcast_items=broadcast_items[-15:],
+        device_items=device_items,
+        sync_notes=sync_notes,
+    )
 
 
 @app.post("/api/pet/{pet_id}/event", response_model=PetEventResponse)
