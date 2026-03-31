@@ -581,6 +581,55 @@ def pets_claiming_device(device_id: str) -> list[PetRecord]:
     return [pet for pet in PETS.values() if pet.device_id == device_id or device_id in list(getattr(pet, "linked_device_ids", []) or [])]
 
 
+def record_device_conflict(device_id: str, pet_ids: list[str], note: str) -> None:
+    created_at = server_time()
+    payload = {
+        "device_id": device_id,
+        "pet_ids": list(pet_ids),
+        "note": note,
+        "conflict": True,
+    }
+    DEVICE_EVENTS.setdefault(device_id, []).append(
+        DeviceEventRecord(
+            device_id=device_id,
+            kind="sync-conflict",
+            message=note,
+            created_at=created_at,
+            meta=payload,
+        )
+    )
+    for pet_id in pet_ids:
+        EVENTS.setdefault(pet_id, []).append(
+            EventRecord(
+                kind="sync-conflict",
+                text=note,
+                tags=["system", "sync", "conflict", "category:system"],
+                created_at=created_at,
+            )
+        )
+
+
+def recommended_action_for_sync(
+    occupancy_state: str,
+    conflict_device_ids: list[str],
+    offline_devices: int,
+    missing_devices: int,
+    primary_device_online: bool,
+    total_devices: int,
+) -> str:
+    if conflict_device_ids or occupancy_state == "conflicted":
+        return "resolve_device_conflict"
+    if missing_devices > 0:
+        return "reconnect_missing_device"
+    if offline_devices > 0:
+        return "wake_offline_device"
+    if not primary_device_online and total_devices > 0:
+        return "switch_primary_or_reconnect"
+    if total_devices == 0:
+        return "link_a_device"
+    return "normal"
+
+
 def pet_device_owner(device_id: str) -> PetRecord | None:
     return next((pet for pet in PETS.values() if pet.device_id == device_id), None)
 
@@ -657,6 +706,14 @@ def build_pet_sync_summary(pet: PetRecord) -> PetSyncSummaryResponse:
     recent_pet = pet_recent_events(pet.pet_id)
     if pet.device_id and pet.device_id not in linked_ids:
         sync_notes.append(f"primary device {pet.device_id} is not linked")
+    recommended_action = recommended_action_for_sync(
+        occupancy_state="conflicted" if conflict_device_ids else "claimed" if linked_ids else "free",
+        conflict_device_ids=conflict_device_ids,
+        offline_devices=offline_devices,
+        missing_devices=missing_devices,
+        primary_device_online=primary_device_online,
+        total_devices=len(device_items),
+    )
     return PetSyncSummaryResponse(
         pet_id=pet.pet_id,
         server_time=server_time(),
@@ -670,6 +727,7 @@ def build_pet_sync_summary(pet: PetRecord) -> PetSyncSummaryResponse:
         conflict_notes=conflict_notes,
         primary_device_present=primary_device_present,
         primary_device_online=primary_device_online,
+        recommended_action=recommended_action,
         device_items=device_items,
         recent_pet_events=recent_pet,
         recent_device_events=recent_device_events,
@@ -691,6 +749,14 @@ def build_device_sync_summary(device_id: str) -> DeviceSyncSummaryResponse:
     occupancy_state = "free"
     if linked_pet_ids:
         occupancy_state = "conflicted" if len(linked_pet_ids) > 1 else "claimed"
+    recommended_action = recommended_action_for_sync(
+        occupancy_state=occupancy_state,
+        conflict_device_ids=[device_id] if len(linked_pet_ids) > 1 else [],
+        offline_devices=1 if device.connection_state == "offline" else 0,
+        missing_devices=0,
+        primary_device_online=bool(pet and pet.device_id == device_id and device.connection_state != "offline"),
+        total_devices=len(linked_pet_ids),
+    )
     return DeviceSyncSummaryResponse(
         device_id=device_id,
         server_time=server_time(),
@@ -700,6 +766,7 @@ def build_device_sync_summary(device_id: str) -> DeviceSyncSummaryResponse:
         linked_pet_ids=linked_pet_ids,
         occupancy_state=occupancy_state,
         conflict_notes=conflict_notes,
+        recommended_action=recommended_action,
         device_state=dict(device.state),
         recent_events=pet_device_recent_events(device_id),
         pet_summary=summary,
@@ -1465,7 +1532,10 @@ def link_pet_device(pet_id: str, req: PetDeviceLinkRequest) -> PetDeviceLinkResp
     if owner is not None and owner.pet_id != pet.pet_id:
         if req.make_primary:
             detach_device_from_pet(owner, req.device_id)
+            record_device_conflict(req.device_id, [owner.pet_id, pet.pet_id], f"device {req.device_id} reassigned to {pet.pet_id}")
         else:
+            record_device_conflict(req.device_id, [owner.pet_id, pet.pet_id], f"device {req.device_id} already linked to another pet")
+            save_state()
             raise HTTPException(status_code=409, detail="device already linked to another pet")
     attach_device_to_pet(pet, req.device_id, make_primary=req.make_primary)
     save_state()
@@ -1497,8 +1567,11 @@ def set_pet_primary_device(pet_id: str, req: PetDevicePrimaryRequest) -> PetDevi
     pet = pet_or_404(pet_id)
     if req.device_id not in pet_linked_device_ids(pet):
         raise HTTPException(status_code=404, detail="device not linked to this pet")
+    previous_primary = pet.device_id
     pet.device_id = req.device_id
     pet.primary_device_id = req.device_id
+    if previous_primary != req.device_id:
+        record_device_conflict(req.device_id, [pet.pet_id], f"pet {pet.pet_id} primary device switched to {req.device_id}")
     save_state()
     return PetDevicePrimaryResponse(ok=True, pet_id=pet_id, primary_device_id=pet.device_id, linked_device_ids=pet_linked_device_ids(pet), server_time=server_time())
 
@@ -1573,6 +1646,14 @@ def pet_broadcast_summary(pet_id: str) -> PetBroadcastSummaryResponse:
                     meta=dict(item["meta"]),
                 )
             )
+    recommended_action = recommended_action_for_sync(
+        occupancy_state="conflicted" if conflict_device_ids else "claimed" if linked_ids else "free",
+        conflict_device_ids=conflict_device_ids,
+        offline_devices=offline_devices,
+        missing_devices=missing_devices,
+        primary_device_online=bool(device_items and device_items[0].is_online),
+        total_devices=len(device_items),
+    )
     return PetBroadcastSummaryResponse(
         pet_id=pet.pet_id,
         server_time=server_time(),
@@ -1584,6 +1665,7 @@ def pet_broadcast_summary(pet_id: str) -> PetBroadcastSummaryResponse:
         conflict_notes=conflict_notes,
         primary_device_id=pet.device_id,
         linked_device_ids=linked_ids,
+        recommended_action=recommended_action,
         broadcast_items=broadcast_items[-15:],
         device_items=device_items,
         sync_notes=sync_notes,
