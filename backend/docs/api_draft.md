@@ -53,7 +53,9 @@
 - `POST /api/pet/{pet_id}/devices/unlink`
 - `POST /api/pet/{pet_id}/devices/primary`
 - `GET /api/pet/{pet_id}/sync`
+- `GET /api/pet/{pet_id}/sync/minimal`
 - `GET /api/device/{device_id}/sync`
+- `GET /api/device/{device_id}/sync/minimal`
 - `POST /api/pet/{pet_id}/event`
 - `GET /api/pet/{pet_id}/memory/summary`
 - `GET /api/pet/{pet_id}/events`
@@ -78,6 +80,7 @@ Most endpoints return `server_time` so the client can align logs and sync window
 - 设备能力可以先做粗分级：lcd / oled / voice / rich / unknown。
 - `preview/sample` 会返回推荐的 `display_mode` 和 `display_hint`。
 - 预览接口返回 palette、ui_slots、layers、notes，并尽量保持模板安全。
+- `sync/minimal` 返回适合固件/UI 的压缩摘要，便于直接渲染状态和按钮提示。
 
 ## Suggested next additions
 

@@ -682,6 +682,51 @@ def action_hint_for_sync(recommended_action: str, primary_device_id: str | None)
     return "状态正常，继续观察即可。"
 
 
+def sync_mini_payload_from_pet(summary: PetSyncSummaryResponse) -> dict[str, object]:
+    return {
+        "subject_id": summary.pet_id,
+        "subject_type": "pet",
+        "server_time": summary.server_time,
+        "health_level": summary.health_level,
+        "summary_line": summary.summary_line,
+        "primary_device_id": summary.primary_device_id,
+        "primary_hint": summary.primary_hint,
+        "action_hint": summary.action_hint,
+        "recommended_action": summary.recommended_action,
+        "occupancy_state": "conflicted" if summary.conflict_device_ids else "claimed" if summary.linked_device_ids else "free",
+        "online_devices": summary.online_devices,
+        "offline_devices": summary.offline_devices,
+        "missing_devices": summary.missing_devices,
+        "conflict_count": len(summary.conflict_device_ids),
+        "device_count": summary.total_devices,
+        "notes": list(summary.sync_notes),
+    }
+
+
+def sync_mini_payload_from_device(summary: DeviceSyncSummaryResponse) -> dict[str, object]:
+    pet_summary = summary.pet_summary
+    if pet_summary is not None:
+        return sync_mini_payload_from_pet(pet_summary)
+    return {
+        "subject_id": summary.device_id,
+        "subject_type": "device",
+        "server_time": summary.server_time,
+        "health_level": summary.health_level,
+        "summary_line": summary.summary_line,
+        "primary_device_id": summary.primary_device_id,
+        "primary_hint": summary.primary_hint,
+        "action_hint": summary.action_hint,
+        "recommended_action": summary.recommended_action,
+        "occupancy_state": summary.occupancy_state,
+        "online_devices": 1 if summary.device_state else 0,
+        "offline_devices": 1 if summary.occupancy_state == "free" else 0,
+        "missing_devices": 0,
+        "conflict_count": len(summary.conflict_notes),
+        "device_count": len(summary.linked_device_ids),
+        "notes": list(summary.conflict_notes),
+    }
+
+
 def pet_device_owner(device_id: str) -> PetRecord | None:
     return next((pet for pet in PETS.values() if pet.device_id == device_id), None)
 
@@ -1671,9 +1716,16 @@ def pet_sync_summary(pet_id: str) -> PetSyncSummaryResponse:
     return build_pet_sync_summary(pet)
 
 
-@app.get("/api/device/{device_id}/sync", response_model=DeviceSyncSummaryResponse)
-def device_sync_summary(device_id: str) -> DeviceSyncSummaryResponse:
-    return build_device_sync_summary(device_id)
+@app.get("/api/device/{device_id}/sync/minimal", response_model=SyncMiniResponse)
+def device_sync_summary_minimal(device_id: str) -> SyncMiniResponse:
+    summary = build_device_sync_summary(device_id)
+    return SyncMiniResponse(**sync_mini_payload_from_device(summary))
+
+
+@app.get("/api/pet/{pet_id}/sync/minimal", response_model=SyncMiniResponse)
+def pet_sync_summary_minimal(pet_id: str) -> SyncMiniResponse:
+    summary = build_pet_sync_summary(pet_or_404(pet_id))
+    return SyncMiniResponse(**sync_mini_payload_from_pet(summary))
 
 
 @app.get("/api/pet/{pet_id}/broadcast", response_model=PetBroadcastSummaryResponse)

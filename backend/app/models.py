@@ -393,6 +393,25 @@ class DeviceSyncSummaryResponse(BaseModel):
     pet_summary: Optional[PetSyncSummaryResponse] = None
 
 
+class SyncMiniResponse(BaseModel):
+    subject_id: str
+    subject_type: str = "pet"
+    server_time: Optional[str] = None
+    health_level: str = "normal"
+    summary_line: Optional[str] = None
+    primary_device_id: Optional[str] = None
+    primary_hint: Optional[str] = None
+    action_hint: Optional[str] = None
+    recommended_action: Optional[str] = None
+    occupancy_state: Optional[str] = None
+    online_devices: int = 0
+    offline_devices: int = 0
+    missing_devices: int = 0
+    conflict_count: int = 0
+    device_count: int = 0
+    notes: List[str] = Field(default_factory=list)
+
+
 class PetEventResponse(BaseModel):
     ok: bool = True
     pet_id: str
