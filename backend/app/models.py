@@ -335,6 +335,10 @@ class PetSyncSummaryResponse(BaseModel):
     primary_device_present: bool = False
     primary_device_online: bool = False
     recommended_action: Optional[str] = None
+    health_level: str = "normal"
+    summary_line: Optional[str] = None
+    primary_hint: Optional[str] = None
+    action_hint: Optional[str] = None
     device_items: List[PetSyncDeviceItem] = Field(default_factory=list)
     recent_pet_events: List[Dict[str, Any]] = Field(default_factory=list)
     recent_device_events: Dict[str, List[Dict[str, Any]]] = Field(default_factory=dict)
@@ -361,6 +365,10 @@ class PetBroadcastSummaryResponse(BaseModel):
     primary_device_id: Optional[str] = None
     linked_device_ids: List[str] = Field(default_factory=list)
     recommended_action: Optional[str] = None
+    health_level: str = "normal"
+    summary_line: Optional[str] = None
+    primary_hint: Optional[str] = None
+    action_hint: Optional[str] = None
     broadcast_items: List[PetBroadcastItem] = Field(default_factory=list)
     device_items: List[PetSyncDeviceItem] = Field(default_factory=list)
     sync_notes: List[str] = Field(default_factory=list)
@@ -376,6 +384,10 @@ class DeviceSyncSummaryResponse(BaseModel):
     occupancy_state: str = "free"
     conflict_notes: List[str] = Field(default_factory=list)
     recommended_action: Optional[str] = None
+    health_level: str = "normal"
+    summary_line: Optional[str] = None
+    primary_hint: Optional[str] = None
+    action_hint: Optional[str] = None
     device_state: Dict[str, Any] = Field(default_factory=dict)
     recent_events: List[Dict[str, Any]] = Field(default_factory=list)
     pet_summary: Optional[PetSyncSummaryResponse] = None

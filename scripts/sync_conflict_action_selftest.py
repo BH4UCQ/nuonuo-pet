@@ -134,6 +134,58 @@ def recommended_action_for_sync(
     return "normal"
 
 
+def health_level_for_sync(occupancy_state: str, conflict_device_ids: list[str], offline_devices: int, missing_devices: int, primary_device_online: bool, total_devices: int) -> str:
+    if conflict_device_ids or occupancy_state == "conflicted":
+        return "critical"
+    if missing_devices > 0:
+        return "degraded"
+    if offline_devices > 0:
+        return "warning"
+    if not primary_device_online and total_devices > 0:
+        return "warning"
+    if total_devices == 0:
+        return "idle"
+    return "normal"
+
+
+def summary_line_for_sync(total_devices: int, online_devices: int, offline_devices: int, missing_devices: int, conflict_count: int) -> str:
+    parts = [f"{total_devices} device(s)"]
+    parts.append(f"{online_devices} online")
+    if offline_devices:
+        parts.append(f"{offline_devices} offline")
+    if missing_devices:
+        parts.append(f"{missing_devices} missing")
+    if conflict_count:
+        parts.append(f"{conflict_count} conflict")
+    return ", ".join(parts)
+
+
+def primary_hint_for_sync(primary_device_id: str | None, primary_device_online: bool, primary_device_present: bool, occupancy_state: str) -> str:
+    if not primary_device_id:
+        return "先绑定一台主设备。"
+    if occupancy_state == "conflicted":
+        return f"主设备 {primary_device_id} 存在占用冲突，先处理冲突。"
+    if not primary_device_present:
+        return f"主设备 {primary_device_id} 不在线或不存在。"
+    if not primary_device_online:
+        return f"主设备 {primary_device_id} 当前离线，建议重新连接。"
+    return f"主设备 {primary_device_id} 在线。"
+
+
+def action_hint_for_sync(recommended_action: str, primary_device_id: str | None) -> str:
+    if recommended_action == "resolve_device_conflict":
+        return "先解除设备冲突，再继续同步。"
+    if recommended_action == "reconnect_missing_device":
+        return "补回缺失设备，重新拉取状态。"
+    if recommended_action == "wake_offline_device":
+        return "唤醒离线设备或检查网络。"
+    if recommended_action == "switch_primary_or_reconnect":
+        return f"可切换主设备 {primary_device_id} 或重新连接。" if primary_device_id else "可切换主设备或重新连接。"
+    if recommended_action == "link_a_device":
+        return "先给宠物绑定一台设备。"
+    return "状态正常，继续观察即可。"
+
+
 def build_pet_sync_summary(pet: PetRecord) -> dict:
     linked_ids = pet_linked_device_ids(pet)
     device_items: list[dict[str, object]] = []
@@ -189,6 +241,15 @@ def build_pet_sync_summary(pet: PetRecord) -> dict:
         primary_device_online=primary_device_online,
         total_devices=len(device_items),
     )
+    occupancy_state = "conflicted" if conflict_device_ids else "claimed" if linked_ids else "free"
+    health_level = health_level_for_sync(
+        occupancy_state=occupancy_state,
+        conflict_device_ids=conflict_device_ids,
+        offline_devices=offline_devices,
+        missing_devices=missing_devices,
+        primary_device_online=primary_device_online,
+        total_devices=len(device_items),
+    )
     return {
         "pet_id": pet.pet_id,
         "server_time": server_time(),
@@ -203,6 +264,10 @@ def build_pet_sync_summary(pet: PetRecord) -> dict:
         "primary_device_present": primary_device_present,
         "primary_device_online": primary_device_online,
         "recommended_action": recommended_action,
+        "health_level": health_level,
+        "summary_line": summary_line_for_sync(len(device_items), online_devices, offline_devices, missing_devices, len(conflict_device_ids)),
+        "primary_hint": primary_hint_for_sync(pet.device_id, primary_device_online, primary_device_present, occupancy_state),
+        "action_hint": action_hint_for_sync(recommended_action, pet.device_id),
         "device_items": device_items,
         "recent_pet_events": recent_pet,
         "recent_device_events": recent_device_events,
@@ -232,16 +297,29 @@ def build_device_sync_summary(device_id: str) -> dict:
         primary_device_online=bool(pet and pet.device_id == device_id and device.connection_state != "offline"),
         total_devices=len(linked_pet_ids),
     )
+    linked_device_ids = pet_linked_device_ids(pet) if pet else []
+    health_level = health_level_for_sync(
+        occupancy_state=occupancy_state,
+        conflict_device_ids=[device_id] if len(linked_pet_ids) > 1 else [],
+        offline_devices=1 if device.connection_state == "offline" else 0,
+        missing_devices=0,
+        primary_device_online=bool(pet and pet.device_id == device_id and device.connection_state != "offline"),
+        total_devices=len(linked_pet_ids),
+    )
     return {
         "device_id": device_id,
         "server_time": server_time(),
         "pet_id": pet.pet_id if pet else None,
         "primary_device_id": pet.device_id if pet else None,
-        "linked_device_ids": pet_linked_device_ids(pet) if pet else [],
+        "linked_device_ids": linked_device_ids,
         "linked_pet_ids": linked_pet_ids,
         "occupancy_state": occupancy_state,
         "conflict_notes": conflict_notes,
         "recommended_action": recommended_action,
+        "health_level": health_level,
+        "summary_line": summary_line_for_sync(len(linked_device_ids), 1 if device.connection_state != "offline" else 0, 1 if device.connection_state == "offline" else 0, 0, len(conflict_notes)),
+        "primary_hint": primary_hint_for_sync(pet.device_id if pet else None, bool(pet and pet.device_id == device_id and device.connection_state != "offline"), bool(pet), occupancy_state),
+        "action_hint": action_hint_for_sync(recommended_action, pet.device_id if pet else None),
         "device_state": dict(device.state),
         "recent_events": pet_device_recent_events(device_id),
         "pet_summary": summary,
@@ -303,6 +381,14 @@ def pet_broadcast_summary(pet: PetRecord) -> dict:
         primary_device_online=bool(device_items and device_items[0]["is_online"]),
         total_devices=len(device_items),
     )
+    health_level = health_level_for_sync(
+        occupancy_state=occupancy_state,
+        conflict_device_ids=conflict_device_ids,
+        offline_devices=offline_devices,
+        missing_devices=missing_devices,
+        primary_device_online=bool(device_items and device_items[0]["is_online"]),
+        total_devices=len(device_items),
+    )
     return {
         "pet_id": pet.pet_id,
         "server_time": server_time(),
@@ -315,6 +401,10 @@ def pet_broadcast_summary(pet: PetRecord) -> dict:
         "primary_device_id": pet.device_id,
         "linked_device_ids": linked_ids,
         "recommended_action": recommended_action,
+        "health_level": health_level,
+        "summary_line": summary_line_for_sync(len(device_items), online_devices, offline_devices, missing_devices, len(conflict_device_ids)),
+        "primary_hint": primary_hint_for_sync(pet.device_id, bool(device_items and device_items[0]["is_online"]), bool(linked_ids), occupancy_state),
+        "action_hint": action_hint_for_sync(recommended_action, pet.device_id),
         "broadcast_items": broadcast_items[-15:],
         "device_items": device_items,
         "sync_notes": sync_notes,
@@ -369,8 +459,20 @@ def main() -> None:
     pprint(broadcast_a)
 
     assert sync_a["recommended_action"] == "resolve_device_conflict"
+    assert sync_a["health_level"] == "critical"
+    assert sync_a["summary_line"] is not None
+    assert sync_a["primary_hint"] is not None
+    assert sync_a["action_hint"] is not None
     assert device_sync["recommended_action"] == "resolve_device_conflict"
+    assert device_sync["health_level"] == "critical"
+    assert device_sync["summary_line"] is not None
+    assert device_sync["primary_hint"] is not None
+    assert device_sync["action_hint"] is not None
     assert broadcast_a["recommended_action"] == "resolve_device_conflict"
+    assert broadcast_a["health_level"] == "critical"
+    assert broadcast_a["summary_line"] is not None
+    assert broadcast_a["primary_hint"] is not None
+    assert broadcast_a["action_hint"] is not None
     assert any(item.kind == "sync-conflict" for item in DEVICE_EVENTS["dev-a"]), "missing device conflict event"
     assert any(item.kind == "sync-conflict" for item in EVENTS["pet-a"]), "missing pet-a conflict event"
     assert any(item.kind == "sync-conflict" for item in EVENTS["pet-b"]), "missing pet-b conflict event"
