@@ -1,0 +1,40 @@
+# Ignore common build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.env
+.venv/
+.venv_pio/
+venv/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# PlatformIO / ESP32
+.pio/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local exports and temporary files
+*.tmp
+*.bak
+# Release artifacts
+release_notes_v0.1.0.*
+nuonuo-pet_v0.1.0_release_bundle.zip
+RELEASE_MANIFEST.txt
+v0.2.0_plan.*
+v0.2.0_plan_bundle.zip
