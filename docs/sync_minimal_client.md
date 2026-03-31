@@ -47,3 +47,15 @@
   "notes": ["device dev-b offline"]
 }
 ```
+
+## 固件接入建议
+
+如果固件暂时还没有 HTTP 客户端，可以先把这个 JSON 映射到内部结构：
+
+- `health_level` → 状态灯颜色
+- `summary_line` → 顶部文案
+- `primary_hint` → 主提示
+- `action_hint` → 按钮提示
+- `recommended_action` → 状态机修复动作
+
+后续只要把这份结构从 HTTP 拉下来并喂给 `applySyncMini()` 即可。

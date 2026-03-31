@@ -9,6 +9,8 @@ This folder contains the first-pass PlatformIO scaffold.
 - `include/state_machine.h`
 - `include/pet_app.h`
 - `include/device_profile.h`
+- `include/sync_summary.h`
+- `include/sync_client.h`
 
 ## 最简日志约定
 
@@ -42,3 +44,15 @@ python3 scripts/firmware_state_selftest.py
 5. `recommended_action` 供状态机自动处理
 
 这样可以把复杂同步逻辑留给后端，ESP32 只负责展示与最小决策。
+
+## HTTP 拉取骨架
+
+当前固件已预留 `SyncClient`：
+
+- 默认后端地址见 `device_profile.h`
+- 默认宠物 ID 为 `NUONUO_DEFAULT_PET_ID`
+- 固件会定期请求 `GET /api/pet/{pet_id}/sync/minimal`
+- 成功后调用 `applySyncMini()` 进入显示/提示逻辑
+
+这一步先把数据流打通，后续再替换成更完整的联网、鉴权和重试策略。
+
