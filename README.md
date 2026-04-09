@@ -195,12 +195,6 @@ python scripts/check_project.py
 - Anthropic Claude API
 - 所有贡献者
 
-## 📮 联系方式
-
-- 项目主页: https://github.com/yourusername/nuonuo-pet
-- 问题反馈: https://github.com/yourusername/nuonuo-pet/issues
-- 邮箱: your.email@example.com
-
 ## 🌟 Star History
 
 如果这个项目对您有帮助，请给我们一个 Star！
