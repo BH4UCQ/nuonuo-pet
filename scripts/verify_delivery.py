@@ -44,6 +44,10 @@ def verify_delivery():
             'backend/app/llm_model_manager.py',
             'backend/app/llm_providers.py',
         ],
+        '安全模块': [
+            'backend/app/security.py',
+            'backend/app/security_simple.py',
+        ],
         '文档目录': [
             'docs/LLM_RECOVERY_SUMMARY.md',
             'docs/PROJECT_STATUS_REPORT.md',
@@ -51,6 +55,9 @@ def verify_delivery():
         ],
         '脚本目录': [
             'scripts/check_project.py',
+        ],
+        '测试目录': [
+            'backend/tests/test_llm_basic.py',
         ],
     }
 
@@ -69,30 +76,71 @@ def verify_delivery():
                 print(f"  [MISSING] {item}")
                 missing_items.append(item)
 
-    # 验证关键Python文件语法
+    # 验证Python文件语法
     print("\n" + "=" * 60)
-    print("验证关键 Python 文件语法")
+    print("验证 Python 文件语法")
     print("=" * 60)
 
-    critical_files = [
-        'backend/app/main.py',
-        'backend/app/models.py',
-        'backend/app/llm_api.py',
-        'backend/app/llm_conversation_service.py',
-    ]
+    python_files = []
+    for root, dirs, files in os.walk('backend/app'):
+        for file in files:
+            if file.endswith('.py'):
+                python_files.append(os.path.join(root, file))
 
     syntax_errors = []
-    for py_file in critical_files:
-        if os.path.exists(py_file):
-            try:
-                with open(py_file, 'r', encoding='utf-8') as f:
-                    compile(f.read(), py_file, 'exec')
-                print(f"[OK] {py_file}")
-            except SyntaxError as e:
-                print(f"[ERROR] {py_file}: {e}")
-                syntax_errors.append((py_file, str(e)))
+    for py_file in python_files:
+        try:
+            with open(py_file, 'r', encoding='utf-8') as f:
+                compile(f.read(), py_file, 'exec')
+            print(f"[OK] {py_file}")
+        except SyntaxError as e:
+            print(f"[ERROR] {py_file}: {e}")
+            syntax_errors.append((py_file, str(e)))
+
+    # 验证文档文件
+    print("\n" + "=" * 60)
+    print("验证文档文件")
+    print("=" * 60)
+
+    doc_files = [
+        'README.md',
+        'LICENSE',
+        'CHANGELOG.md',
+        'CONTRIBUTING.md',
+        'PROJECT_MANIFEST.md',
+        'docs/LLM_RECOVERY_SUMMARY.md',
+        'docs/PROJECT_STATUS_REPORT.md',
+        'docs/DEPLOYMENT.md',
+    ]
+
+    for doc_file in doc_files:
+        if os.path.exists(doc_file):
+            size = os.path.getsize(doc_file)
+            print(f"[OK] {doc_file} ({size} bytes)")
         else:
-            print(f"[SKIP] {py_file} (文件不存在)")
+            print(f"[MISSING] {doc_file}")
+            missing_items.append(doc_file)
+
+    # 验证脚本文件
+    print("\n" + "=" * 60)
+    print("验证脚本文件")
+    print("=" * 60)
+
+    script_files = [
+        'setup.bat',
+        'setup.sh',
+        'start.bat',
+        'start.sh',
+        'scripts/check_project.py',
+    ]
+
+    for script_file in script_files:
+        if os.path.exists(script_file):
+            size = os.path.getsize(script_file)
+            print(f"[OK] {script_file} ({size} bytes)")
+        else:
+            print(f"[MISSING] {script_file}")
+            missing_items.append(script_file)
 
     # 输出验证结果
     print("\n" + "=" * 60)

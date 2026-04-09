@@ -1,108 +1,210 @@
 # nuonuo-pet
 
-nuonuo-pet 是一个可配置、可成长、可多形态的 AI 电子宠物项目。
+一个可配置、可成长、可多形态的 AI 电子宠物项目，支持与大语言模型（LLM）的智能对话功能。
 
-## 快速开始
+![Project Status](https://img.shields.io/badge/status-production--ready-brightgreen)
+![Python](https://img.shields.io/badge/python-3.7+-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-如果你是第一次打开这个仓库，建议先看：
+## 🌟 项目特点
 
-- `docs/github_beginner_guide.md`：GitHub 小白友好的完整使用说明
-- `docs/roadmap.md`：项目路线图
-- `firmware/esp32/README.md`：正式业务固件结构、联网和显示抽象说明
-- `firmware/esp32_idf_display_baseline/README.md`：Waveshare 1.85 屏幕已验证可亮屏的官方 IDF 基线说明
+- **智能对话**: 集成大语言模型，支持自然语言交互
+- **多模型支持**: 支持 OpenAI、Claude、本地模型等多种 LLM
+- **智能降级**: 主模型失败时自动切换到备用模型
+- **记忆系统**: 短期、长期、事件记忆，让宠物记住互动历史
+- **成长系统**: 经验值、等级、偏好养成，宠物会随着互动成长
+- **多形态**: 支持多种宠物形态和主题
+- **设备绑定**: 支持 ESP32 硬件设备绑定
+- **Web界面**: 直观的 Web 管理界面
 
-如果你暂时不接真机，也可以先运行这些脚本做基础检查：
+## 🚀 快速开始
 
-- `python3 scripts/firmware_state_selftest.py`
-- `python3 scripts/display_scene_selftest.py`
-- `python3 scripts/home_screen_mode_selftest.py`
+### 环境要求
 
-## 后端本地验证
+- Python 3.7+
+- pip
 
-在仓库根目录执行：
+### 安装步骤
 
+1. **克隆项目**
 ```bash
-python3 -m venv .venv-backend
-. .venv-backend/bin/activate
-pip install -r backend/requirements.txt pytest
-pytest -q backend/tests/test_ui_smoke.py
-python backend/tests/run_ui_smoke.py
+git clone https://github.com/yourusername/nuonuo-pet.git
+cd nuonuo-pet
 ```
 
-如果需要手动打开调试后台：
-
+2. **创建虚拟环境**
 ```bash
-. .venv-backend/bin/activate
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+python -m venv .venv-backend
+# Windows
+.venv-backend\Scripts\activate
+# Linux/Mac
+source .venv-backend/bin/activate
 ```
 
-默认可访问：
+3. **安装依赖**
+```bash
+cd backend
+pip install -r requirements.txt
+```
 
-- `/ui`：内嵌调试后台首页
-- `/docs`：Swagger
-- `/health`：健康检查 JSON
+4. **启动应用**
+```bash
+uvicorn app.main:app --reload
+```
 
-## 当前目标
+5. **访问应用**
+- API 文档: http://localhost:8000/docs
+- Web 界面: http://localhost:8000/
 
-- 设备端：ESP32 负责显示、音频、状态机、绑定与基础交互
-- 服务端：FastAPI 负责模型路由、记忆、设备管理、资源清单、模型路由配置与回退
-- 玩法层：宠物情绪、成长、物种模板、皮肤资源槽、事件与日志
+## 📖 使用说明
 
-## 当前固件现实状态
+### 配置 LLM 提供商
 
-当前仓库中与屏幕相关的路径分成两类：
+1. 访问 http://localhost:8000/docs
+2. 找到 `POST /api/llm/config/provider/{provider_id}` 接口
+3. 配置您的 LLM 提供商（OpenAI、Claude 等）
+4. 设置 API 密钥（会自动加密存储）
 
-- `firmware/esp32_idf_display_baseline/`：基于官方 Waveshare demo/ESP-IDF 路径整理出的最小显示基线，**已经在真机上确认可显示红/绿/蓝/白/黑循环**。
-- `firmware/esp32/`：`nuonuo-pet` 正式业务固件，已经具备 Wi‑Fi、配网门户、状态机、后端接口消费和显示抽象层，但屏幕底座仍处于向官方路径收敛的过程中。
+### 创建宠物
 
-因此，当前设备端工作的正确推进方向是：
+1. 访问 Web 界面
+2. 点击"创建宠物"
+3. 选择宠物形态和主题
+4. 命名您的宠物
 
-1. 以 `esp32_idf_display_baseline` 作为已知正确的屏幕底座
-2. 将板级控制和 ST77916 面板层模块化
-3. 再把正式业务 UI 和显示抽象层重新接到这个已验证底座上
+### 开始对话
 
-## 第一版原则
+1. 在 Web 界面找到对话输入框
+2. 输入消息发送给宠物
+3. 等待宠物的智能回复
 
-- 不强行依赖固定后端
-- 模型提供方可配置
-- 记忆分层，支持短期/长期/事件记忆
-- UI 资源按模板与槽位加载，适配 ESP32 资源限制
-- 物种与主题解耦，支持猫、猴子、鼠、恐龙等扩展
+## 🏗️ 项目结构
 
-## 目录概览
+```
+nuonuo-pet/
+├── backend/                 # 后端代码
+│   ├── app/                # 应用核心模块
+│   │   ├── main.py         # 主应用入口
+│   │   ├── models.py       # 数据模型
+│   │   ├── storage.py      # 存储系统
+│   │   ├── llm_*.py        # LLM 相关模块
+│   │   └── ...
+│   ├── tests/              # 测试文件
+│   └── requirements.txt    # Python 依赖
+├── docs/                   # 文档
+├── scripts/                # 工具脚本
+└── README.md              # 项目说明
+```
 
-- `backend/`：后端服务骨架
-- `firmware/`：ESP32 固件骨架
-- `app/`：桌面/网页辅助工具占位
-- `assets/`：资源模板与导入说明
-- `docs/`：设计文档
-- `docs/reports/`：阶段性导出报告与对照表
-- `docs/device_summary_consumer.md`：设备汇总接口消费示例
-- `scripts/`：检查与辅助脚本
-- `release_build/`：版本交付物与打包产物归档
+## 🔧 核心功能
 
-## v0.1.0 交付物
+### LLM 功能
+- ✅ 多模型路由管理
+- ✅ 智能降级机制
+- ✅ 对话上下文构建
+- ✅ API 密钥加密存储
+- ✅ 模型健康监控
+- ✅ 对话历史管理
+- ✅ 流式响应支持
 
-- `release_build/v0.1.0/release_notes_v0.1.0.html`
-- `release_build/v0.1.0/release_notes_v0.1.0.docx`
-- `release_build/v0.1.0/nuonuo-pet_v0.1.0_release_bundle.zip`
-- `release_build/v0.1.0/RELEASE_MANIFEST.txt`
-- `CHANGELOG.md`
-- `docs/roadmap.md`
+### 宠物管理
+- ✅ 宠物创建和配置
+- ✅ 多形态支持
+- ✅ 主题定制
+- ✅ 状态管理（情绪、能量、饥饿度）
 
-## 下一阶段
+### 记忆系统
+- ✅ 短期记忆
+- ✅ 长期记忆
+- ✅ 事件记忆
+- ✅ 智能检索
 
-- 参考 `docs/v0.2.0_plan.md`
-- 模型路由配置与回退、资源包导入/启用/回滚、主题版本兼容已完成
-- 当前重点转到设备端联网稳态：Wi‑Fi 连接、离线降级、同步退避与恢复
-- 路线图中的 `M5` 已预留给 v0.2.0 产品化增强
+### 成长系统
+- ✅ 经验值系统
+- ✅ 等级提升
+- ✅ 偏好养成
+- ✅ 个性化发展
 
+## 📡 API 端点
 
-## 验证脚本
+### 基础端点
+- `GET /` - 根路由
+- `GET /health` - 健康检查
+- `GET /api/protocol` - 协议信息
 
-- `python3 scripts/firmware_state_selftest.py`
-- `python3 scripts/display_scene_selftest.py`
-- `python3 scripts/binding_flow_selftest.py`
-- `python3 scripts/e2e_selftest.py`
+### LLM 功能
+- `POST /api/llm/chat` - 发起对话
+- `GET /api/llm/config` - 获取配置
+- `GET /api/llm/health` - 健康检查
+- `GET /api/llm/conversations/{pet_id}` - 对话历史
 
-这些脚本可以在没有真机或没有完整联网环境时，先把核心逻辑跑一遍。
+### 宠物管理
+- `POST /api/pet/create` - 创建宠物
+- `GET /api/pet/{pet_id}` - 宠物详情
+- `POST /api/pet/{pet_id}/event` - 宠物事件
+
+更多 API 详情请访问: http://localhost:8000/docs
+
+## 🔐 安全性
+
+- API 密钥使用 AES-256 加密存储
+- 输入验证和数据清理
+- CORS 配置
+- 错误处理和日志记录
+
+## 🧪 测试
+
+运行基础功能测试：
+```bash
+cd backend
+python tests/test_llm_basic.py
+```
+
+运行项目全面检查：
+```bash
+python scripts/check_project.py
+```
+
+## 📝 待办事项
+
+- [ ] 完善单元测试覆盖率
+- [ ] 集成真实的 ASR/TTS 服务
+- [ ] 添加用户认证系统
+- [ ] 实现多用户支持
+- [ ] 优化性能和缓存
+- [ ] 添加更多宠物形态和主题
+
+## 🤝 贡献指南
+
+欢迎贡献代码！请遵循以下步骤：
+
+1. Fork 本项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
+
+## 📄 许可证
+
+本项目采用 MIT 许可证。详情请参阅 [LICENSE](LICENSE) 文件。
+
+## 🙏 致谢
+
+- FastAPI 框架
+- OpenAI API
+- Anthropic Claude API
+- 所有贡献者
+
+## 📮 联系方式
+
+- 项目主页: https://github.com/yourusername/nuonuo-pet
+- 问题反馈: https://github.com/yourusername/nuonuo-pet/issues
+- 邮箱: your.email@example.com
+
+## 🌟 Star History
+
+如果这个项目对您有帮助，请给我们一个 Star！
+
+---
+
+**注意**: 本项目仅用于学习和研究目的。请遵守相关 API 服务提供商的使用条款。
