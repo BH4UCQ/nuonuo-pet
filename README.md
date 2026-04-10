@@ -245,12 +245,6 @@ DEBUG=true
 
 ---
 
-## 联系方式
-
-- 项目主页: https://github.com/your-username/nuonuo-pet
-- 问题反馈: https://github.com/your-username/nuonuo-pet/issues
-- 邮箱: your-email@example.com
-
 <div align="center">
 
 **Made with ❤️ by Nuonuo Pet Team**
