@@ -1,0 +1,30 @@
+{
+  "models": [
+    {
+      "model_id": "gpt-3.5-turbo",
+      "model_name": "GPT-3.5 Turbo",
+      "provider_id": "openai",
+      "context_window": 4096,
+      "max_output_tokens": 2000,
+      "supports_streaming": true,
+      "supports_functions": true,
+      "cost_per_1k_tokens": 0.002,
+      "latency_tier": "fast",
+      "quality_tier": "balanced",
+      "enabled": true
+    },
+    {
+      "model_id": "gpt-4",
+      "model_name": "GPT-4",
+      "provider_id": "openai",
+      "context_window": 8192,
+      "max_output_tokens": 2000,
+      "supports_streaming": true,
+      "supports_functions": true,
+      "cost_per_1k_tokens": 0.03,
+      "latency_tier": "balanced",
+      "quality_tier": "premium",
+      "enabled": true
+    }
+  ]
+}

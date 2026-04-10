@@ -1,0 +1,7 @@
+{
+  "default_provider_id": "openai",
+  "default_model_id": "gpt-3.5-turbo",
+  "fallback_chain": [
+    "gpt-3.5-turbo"
+  ]
+}

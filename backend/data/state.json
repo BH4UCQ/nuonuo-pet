@@ -1,0 +1,106 @@
+{
+  "devices": [
+    {
+      "device_id": "dev-smoke-1",
+      "hardware_model": "waveshare-1.85",
+      "firmware_version": "0.1.0",
+      "capabilities": [
+        "display",
+        "touch"
+      ],
+      "bound": false,
+      "owner_id": null,
+      "bind_code": null,
+      "bind_expires_at": null,
+      "state": {},
+      "last_seen_at": "2026-04-03T09:25:21.434921+00:00",
+      "connection_state": "unbound",
+      "offline_reason": null
+    }
+  ],
+  "device_events": {
+    "dev-smoke-1": [
+      {
+        "device_id": "dev-smoke-1",
+        "kind": "register",
+        "message": "device registered or refreshed",
+        "created_at": "2026-04-03T09:25:21.419624+00:00",
+        "meta": {
+          "hardware_model": "waveshare-1.85",
+          "firmware_version": "0.1.0",
+          "bound": false
+        }
+      },
+      {
+        "device_id": "dev-smoke-1",
+        "kind": "heartbeat",
+        "message": "device heartbeat received",
+        "created_at": "2026-04-03T09:25:21.435359+00:00",
+        "meta": {
+          "note": "pytest smoke heartbeat"
+        }
+      }
+    ]
+  },
+  "pets": [
+    {
+      "pet_id": "pet-smoke-1",
+      "name": "nuonuo",
+      "species_id": "cat-default",
+      "theme_id": "cat-gold-day",
+      "model_route_id": "cloud-balanced",
+      "model_provider": "cloud",
+      "model_name": "general-chat",
+      "growth_stage": "egg",
+      "level": 1,
+      "exp": 6,
+      "mood": "happy",
+      "energy": 92,
+      "hunger": 20,
+      "affection": 56,
+      "owner_id": "owner-smoke",
+      "device_id": "dev-smoke-1",
+      "primary_device_id": "dev-smoke-1",
+      "linked_device_ids": [
+        "dev-smoke-1"
+      ],
+      "growth_preferences": {
+        "play": 2,
+        "care": 0,
+        "rest": 0,
+        "feed": 0,
+        "chat": 0,
+        "praise": 0
+      },
+      "preference_notes": [
+        "likes_play"
+      ]
+    }
+  ],
+  "memory": {},
+  "events": {
+    "pet-smoke-1": [
+      {
+        "kind": "play",
+        "text": "pytest smoke play",
+        "tags": [
+          "ui",
+          "manual",
+          "category:play"
+        ],
+        "created_at": "2026-04-03T09:25:21.440951+00:00"
+      }
+    ]
+  },
+  "model_route_config": {
+    "default_route_id": "cloud-balanced",
+    "fallback_route_ids": [
+      "local-default",
+      "cloud-balanced"
+    ],
+    "prefer_enabled": true,
+    "allow_manual_override": true,
+    "routing_notes": "Prefer balanced cloud, fall back to local when disabled or missing."
+  },
+  "resource_packs": {}
+}
